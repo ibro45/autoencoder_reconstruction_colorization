@@ -7,7 +7,8 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 
 from data import get_cifar_train_val_test, YCbCrToRGB, GrayscaleToRGB
-from model import AutoEncoder
+from model import AutoEncoder, AutoEncoder2, AutoEncoder3
+
 
 class Engine:
     def __init__(self, num_epochs, batch_size, lr, experiment_name, mode="reconstruction", num_workers=4):
@@ -20,7 +21,7 @@ class Engine:
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+        print(self.device)
         self.mode = mode.lower()
         if self.mode == "reconstruction":
             in_channels, out_channels = 3, 3
@@ -30,7 +31,7 @@ class Engine:
             raise NotImplemented("Only `colorization` and `reconstruction` modes available.")
 
         self.num_epochs = num_epochs
-        self.model = AutoEncoder(in_channels, out_channels, device=self.device)
+        self.model = AutoEncoder3(in_channels, out_channels, device=self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr)
         self.criterion = nn.MSELoss()
 
@@ -117,7 +118,7 @@ class Engine:
     def test(self, best=True):
         print('Testing...')
         if best:
-            self.load_checkpoint(f'{self.output_dir}/best_checkpoint.pth')
+            self.epoch = self.load_checkpoint(f'{self.output_dir}/best_checkpoint.pth')
         test_loss = self._run_epoch(stage='test')
         print(f'Test loss: {test_loss:.6f}')
 
@@ -142,6 +143,7 @@ class Engine:
             f"Checkpoint was trained for {checkpoint['mode']}, but the current mode is {self.mode}"
         self.model.load_state_dict(checkpoint["model"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])
+        return checkpoint["epoch"]
 
     def _log_images(self, data, input, output, stage):
         ycbr_to_rgb = YCbCrToRGB()
@@ -168,6 +170,6 @@ class Engine:
 
 
 if __name__ == "__main__":
-    engine = Engine(10, 16, 0.001, mode="reconstruction", experiment_name="reconstruction1")
+    engine = Engine(300, 512, 0.001, num_workers=32, mode="colorization", experiment_name="colorization3")
     engine.train()
     engine.test()
